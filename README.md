@@ -8,6 +8,14 @@ Since we are mapping out a 2D plane, we can represent the space with a numpy arr
 area, 0 represents a free space, and a positive number represents an obstacle. More generally, each element in the array will either be a probability 
 that an obstacle is there or a -1.
 
-## Data Flow
-Initialize the map with the origin at the start point.
+## Program Flow
+0. Initialize the map with the first LIDAR observation. Initialize world coordinates with the origin at the start point, x as longitudinal axis, and y as lateral axis.
+
+While there is still unmapped spae:
+1. Feed forward NN inference to generate a waypoint based on the known observations.
+2. Move to the waypoint.
+3. New LIDAR observation.
+4. State estimation to determine new coordinates.
+5. Rotate and translate new LIDAR observation to the world perspective. Append to new map.
+
 
