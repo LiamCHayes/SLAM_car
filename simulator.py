@@ -1,11 +1,12 @@
 """
-Classes to generate ground truth data for NN simulation training
+Class to have the car interact with the environment
 """
 
 ###################
 # Imports and Setup
 ###################
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 #########
@@ -88,9 +89,29 @@ class SimulatedMap:
 
         return coordinates
 
+    def get_free_area(self):
+        """
+        Get indices of the free space in the map
+
+        Returns:
+            indices (numpy array): 2 x indices where first row is row index and second row is column index
+        """
+        indices = np.zeros((2, 1))
+        for row in range(self.size[0]):
+            for col in range(self.size[1]):
+                if self.is_within_walls((row, col)) and self.map[row, col] == 0:
+                    indices = np.append(indices, np.array([[row], [col]]), axis=1)
+        indices = indices[:, 1:]
+
+        return indices
+
+
     def is_within_walls(self, point):
         """
         Checks if a point is within the boundries of the wall
+
+        args:
+            point (tupple): point we are testing (row, col)
 
         Returns:
             flag (bool): True if the point is within the walls
@@ -188,3 +209,106 @@ class SimulatedMap:
                         continue
                     if self.is_within_walls((row, col)):
                         self.map[row, col] = 1
+
+    def plot(self):
+        """
+        Plots the empty map
+        """
+        plt.imshow(self.map)
+        plt.show()
+
+
+class Car:
+    """
+    Object for a car mapping the space. The location of the car is defined by cartesian coordinates.
+    The car's coordinate system is defined by the initial position of the car. The initial position
+    of the car is the origin for its coordinate system.
+    
+    args:
+        lidar_radius (int): radius of the lidar, positioned in the center of the car
+
+    attributes:
+        lidar_radius (int): radius of the lidar, positioned in the center of the car
+        location_self (tupple): location of the car according to its own map coordinate system (row, column)
+        map (numpy array): The map according to the car. Only uses sensor data to create this map.
+    """
+    def __init__(self, lidar_radius):
+        self.lidar_radius = lidar_radius
+        self.location_self = (0, 0)
+        self.map = None
+
+    def read_lidar(self, ground_truth_map: SimulatedMap, ground_truth_location):
+        """
+        Gets a lidar reading for the current location in the map
+
+        args:
+            ground_truth_map (SimulatedMap object): map that the car is in
+            ground_truth_location (tupple): location of the car in the simulated map coordinate system (row, column)
+        """
+        pass
+
+
+class Simulator:
+    """
+    Object to run interactions between car and environment.
+
+    args:
+        simulated_map (SimulatedMap object): ground truth map object
+        car (Car object): object of car in map
+
+    attributes:
+        simulated_map (SimulatedMap object): ground truth map object
+        car (Car object): object of car in map
+        ground_truth_location (tupple): Location of the car in the ground truth map (row, column)
+    """
+    def __init__(self, simulated_map: SimulatedMap):
+        self.simulated_map = simulated_map
+        self.car = None
+        self.ground_truth_location = None
+
+    def spawn_car(self, lidar_radius, plot=False):
+        """
+        Spawns the car in the map in a random spot
+
+        args:
+            lidar_radius (int): radius of the lidar, positioned in the center of the car
+            plot (bool): True if you want to see a map with the car mapped on it when spawned
+        
+        returns:
+            car (Car object): car spawned in the environment
+            spawn_point (tupple): spawn location in the ground truth map (row, col)
+        """
+        # Get free area and pick a random sample from this area
+        free_area = self.simulated_map.get_free_area()
+
+        # Spawn until there is no collision
+        in_free_space = False
+        while not in_free_space:
+            idx = np.random.randint(0, free_area.shape[1])
+            spawn_point = free_area[:, idx]
+            car_radius = 5
+            free_area_row = free_area[1, np.where(free_area[0, :] == spawn_point[0])[0]]
+            free_area_col = free_area[0, np.where(free_area[1, :] == spawn_point[1])[0]]
+
+            temp_flag = True
+            for val in np.arange(spawn_point[1] - car_radius, spawn_point[1] + car_radius):
+                if val not in free_area_row:
+                    temp_flag = False
+            for val in np.arange(spawn_point[0] - car_radius, spawn_point[0] + car_radius):
+                if val not in free_area_col:
+                    temp_flag = False
+            in_free_space = temp_flag
+        spawn_point = (int(spawn_point[0]), int(spawn_point[1]))
+
+        # Plot car if desired
+        if plot:
+            for row in np.arange(spawn_point[0]-2, spawn_point[0]+2):
+                for col in np.arange(spawn_point[1]-2, spawn_point[1]+2):
+                    new_map = self.simulated_map.map
+                    new_map[row, col] = 2
+            plt.imshow(new_map)
+            plt.show()
+
+        # Create Car object
+        self.car = Car(lidar_radius)
+        self.ground_truth_location = spawn_point
