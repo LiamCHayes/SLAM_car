@@ -1,5 +1,5 @@
 """
-Class to have the car interact with the environment
+Simulator of the environment and car. Used for NN training.
 """
 
 ###################
@@ -222,20 +222,50 @@ class Car:
     """
     Object for a car mapping the space. The location of the car is defined by cartesian coordinates.
     The car's coordinate system is defined by the initial position of the car. The initial position
-    of the car is the origin for its coordinate system.
+    of the car is the origin (0, 0) for its coordinate system.
     
     args:
         lidar_radius (int): radius of the lidar, positioned in the center of the car
 
     attributes:
         lidar_radius (int): radius of the lidar, positioned in the center of the car
-        location_self (tupple): location of the car according to its own map coordinate system (row, column)
         map (numpy array): The map according to the car. Only uses sensor data to create this map.
+        path (numpy array): 2 x num_steps estimated path of the car
+        coordinates (tupple): coordinates of the car in its map estimation
+        np_origin_coordinates (tupple): coordinates of the map origin in the numpy array map
+        prev_np_origin_coordinates (tupple): coordinates of the map origin in the numpy array map in the previous ste[]
     """
     def __init__(self, lidar_radius):
         self.lidar_radius = lidar_radius
-        self.location_self = (0, 0)
         self.map = None
+        self.path = None
+        self.coordinates = None
+        self.np_origin_coordinates = None
+        self.prev_np_origin_coordinates = None
+
+    def update_location(self, move_vector, add_noise):
+        """
+        Updates location with some optional noise to simulate real world updating
+
+        args:
+            move_vector (tupple): vector the car is moving in
+            add_noise (bool): add noise to position estimation?
+        """
+        # Add noise
+        noise_row = int(np.round(np.random.normal(0, 1))) if add_noise else 0
+        noise_col = int(np.round(np.random.normal(0, 1))) if add_noise else 0
+        move_row = -move_vector[0] + noise_row
+        move_col = move_vector[1] + noise_col
+
+        # Update variables
+        self.coordinates = (self.coordinates[0] + move_row,
+                            self.coordinates[1] + move_col)
+        self.path = np.append(self.path, np.array([[self.coordinates[0]],[self.coordinates[1]]]), axis=1)
+
+        self.prev_np_origin_coordinates = self.np_origin_coordinates
+        origin_np_index_row = np.max(self.path[0]) + self.lidar_radius
+        origin_np_index_col = -(np.min(self.path[1]) - self.lidar_radius)
+        self.np_origin_coordinates = (origin_np_index_row, origin_np_index_col)
 
     def read_lidar(self, ground_truth_map: SimulatedMap, ground_truth_location):
         """
@@ -244,8 +274,70 @@ class Car:
         args:
             ground_truth_map (SimulatedMap object): map that the car is in
             ground_truth_location (tupple): location of the car in the simulated map coordinate system (row, column)
+
+        returns:
+            lidar_reading (numpy array): value of the lidar reading at the location of the car
         """
-        pass
+        lidar_reading = np.full((self.lidar_radius*2+1, self.lidar_radius*2+1), -1)
+
+        # Loop through indices and record ones that are within radius
+        for li_row, row in enumerate(np.arange(ground_truth_location[0]-self.lidar_radius, ground_truth_location[0]+self.lidar_radius+1)):
+            for li_col, col in enumerate(np.arange(ground_truth_location[1]-self.lidar_radius, ground_truth_location[1]+self.lidar_radius+1)):
+                distance = ((row-ground_truth_location[0])**2 + (col-ground_truth_location[1])**2)**0.5
+                if distance <= self.lidar_radius:
+                    lidar_reading[li_row, li_col] = ground_truth_map.map[row, col]
+
+        return lidar_reading
+
+    def record_lidar(self, lidar_reading):
+        """
+        Adds lidar reading to the map at the cars current location (according to its calcluation)
+
+        args:
+            lidar_reading (numpy array): lidar reading to append to map
+        """
+        if self.map is None:
+            self.map = lidar_reading
+            self.path = np.array([[0], [0]])
+            self.coordinates = (0, 0)
+            self.np_origin_coordinates = (self.lidar_radius, self.lidar_radius)
+        else:
+            # calculate the nececary size of the new map
+            row_dim = (np.max(self.path[0]) + self.lidar_radius) - (np.min(self.path[0]) - self.lidar_radius)
+            col_dim = (np.max(self.path[1]) + self.lidar_radius) - (np.min(self.path[1]) - self.lidar_radius)
+
+            # calculate where we are currently in relation to the numpy array by
+            # finding where we are in the relation to the origin
+            coord_np_index_row = self.np_origin_coordinates[0] - self.coordinates[0]
+            coord_np_index_col = self.np_origin_coordinates[1] + self.coordinates[1]
+
+            # Map the old map (previous step) onto the new map (current step)
+            new_map = np.full((row_dim+1, col_dim+1), -1)
+            coord_shift_row = self.np_origin_coordinates[0] - self.prev_np_origin_coordinates[0]
+            coord_shift_col = self.np_origin_coordinates[1] - self.prev_np_origin_coordinates[1]
+            for row in range(self.map.shape[0]):
+                for col in range(self.map.shape[1]):
+                    new_map[row + coord_shift_row, col + coord_shift_col] = self.map[row, col]
+
+            # Add the lidar reading to the new map
+            new_map_reading_idx_row = np.arange(coord_np_index_row - self.lidar_radius, coord_np_index_row + self.lidar_radius + 1)
+            new_map_reading_idx_col = np.arange(coord_np_index_col - self.lidar_radius, coord_np_index_col + self.lidar_radius + 1)
+            for lidar_idx_row, row in enumerate(new_map_reading_idx_row):
+                for lidar_idx_col, col in enumerate(new_map_reading_idx_col):
+                    if new_map[row, col] == -1:
+                        new_map[row, col] = lidar_reading[lidar_idx_row, lidar_idx_col]
+                    else:
+                        if lidar_reading[lidar_idx_row, lidar_idx_col] != -1:
+                            new_map[row, col] = new_map[row, col] + lidar_reading[lidar_idx_row, lidar_idx_col]
+            self.map = new_map
+
+    def plot(self):
+        """
+        Plots the current car knowledge
+        """
+        plt.imshow(self.map)
+        plt.title('Current Map - Knowledge of Car')
+        plt.show()
 
 
 class Simulator:
@@ -260,11 +352,13 @@ class Simulator:
         simulated_map (SimulatedMap object): ground truth map object
         car (Car object): object of car in map
         ground_truth_location (tupple): Location of the car in the ground truth map (row, column)
+        path (numpy array): 2 x num_steps ground truth path of the car
     """
     def __init__(self, simulated_map: SimulatedMap):
         self.simulated_map = simulated_map
         self.car = None
         self.ground_truth_location = None
+        self.path = None
 
     def spawn_car(self, lidar_radius, plot=False):
         """
@@ -300,15 +394,79 @@ class Simulator:
             in_free_space = temp_flag
         spawn_point = (int(spawn_point[0]), int(spawn_point[1]))
 
-        # Plot car if desired
-        if plot:
-            for row in np.arange(spawn_point[0]-2, spawn_point[0]+2):
-                for col in np.arange(spawn_point[1]-2, spawn_point[1]+2):
-                    new_map = self.simulated_map.map
-                    new_map[row, col] = 2
-            plt.imshow(new_map)
-            plt.show()
-
-        # Create Car object
+        # initialize attributes
         self.car = Car(lidar_radius)
         self.ground_truth_location = spawn_point
+        self.car.record_lidar(self.car.read_lidar(self.simulated_map, spawn_point))
+        self.path = np.array([[spawn_point[0]], [spawn_point[1]]])
+
+        # Plot car if desired
+        if plot:
+            self.plot_car()
+            self.car.plot()
+
+    def step(self, move_vector, add_noise, plot=False):
+        """
+        Do a single time step
+            1. Execute movement
+            2. Read from LIDAR
+            3. Record LIDAR measurement in the car map
+
+        args:
+            move_vector (tupple): Where to go next (change in row, change in col) in the car reference frame
+            add_noise (bool): Add noise to car state estimation if desired
+            plot (bool): True if you want to see a map with the car mapped on it when spawned
+        """
+        # 1. execute movement
+        self.ground_truth_location = (self.ground_truth_location[0] + move_vector[0],
+                                      self.ground_truth_location[1] + move_vector[1])
+        self.path = np.append(self.path, np.array([[self.ground_truth_location[0]], [self.ground_truth_location[1]]]), axis=1)
+        if self.check_collision():
+            print("COLLISION: Car has collided with a wall or obstacle")
+            return
+        self.car.update_location(move_vector, add_noise)
+        
+        # 2. Read from LIDAR
+        lidar_reading = self.car.read_lidar(self.simulated_map, self.ground_truth_location)
+
+        # 3. Record LIDAR measurement in car map
+        self.car.record_lidar(lidar_reading)
+
+        print(self.car.path)
+        # Plot if desired
+        if plot:
+            self.plot_car()
+            self.car.plot()
+
+    def check_collision(self):
+        """
+        Checks if the car has collided with an obstacle or wall
+        
+        Returns:
+            flag (bool): True if car is in a forbidden area, False otherwise
+        """
+        ########
+        # TODO #
+        ########
+        return False
+
+    def plot_car(self):
+        """
+        Plots the ground truth car location
+        """
+        new_map = np.copy(self.simulated_map.map)
+        for row in np.arange(self.ground_truth_location[0]-2, self.ground_truth_location[0]+2):
+            for col in np.arange(self.ground_truth_location[1]-2, self.ground_truth_location[1]+2):
+                new_map[row, col] = 2
+        plt.imshow(new_map)
+        plt.title("Ground Truth Car Position")
+        plt.show()
+
+    def plot_path(self):
+        """
+        Plots the ground truth path of the car through the environment
+        """
+        ########
+        # TODO #
+        ########
+        pass
