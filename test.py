@@ -37,10 +37,12 @@ def simulator_test():
 
     sim = simulator.Simulator(sim_map)
 
-    sim.spawn_car(lidar_radius=5, plot=True)
-    sim.step((5,5), False, plot=True)
-    sim.step((5,-5), False, plot=True)
-    sim.step((5,-5), False, plot=True)
+    sim.spawn_car(lidar_radius=15, plot=True)
+    no_collision = True
+    while no_collision:
+        x = int(input('Row move: '))
+        y = int(input('col move: '))
+        no_collision = sim.step((x,y), False, plot=True)
 
 
 ######

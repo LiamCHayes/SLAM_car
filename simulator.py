@@ -416,6 +416,9 @@ class Simulator:
             move_vector (tupple): Where to go next (change in row, change in col) in the car reference frame
             add_noise (bool): Add noise to car state estimation if desired
             plot (bool): True if you want to see a map with the car mapped on it when spawned
+
+        returns:
+            success (bool): True if step is successful, False otherwise
         """
         # 1. execute movement
         self.ground_truth_location = (self.ground_truth_location[0] + move_vector[0],
@@ -423,7 +426,7 @@ class Simulator:
         self.path = np.append(self.path, np.array([[self.ground_truth_location[0]], [self.ground_truth_location[1]]]), axis=1)
         if self.check_collision():
             print("COLLISION: Car has collided with a wall or obstacle")
-            return
+            return False
         self.car.update_location(move_vector, add_noise)
         
         # 2. Read from LIDAR
@@ -432,11 +435,12 @@ class Simulator:
         # 3. Record LIDAR measurement in car map
         self.car.record_lidar(lidar_reading)
 
-        print(self.car.path)
         # Plot if desired
         if plot:
-            self.plot_car()
+            self.plot_path()
             self.car.plot()
+
+        return True
 
     def check_collision(self):
         """
@@ -445,10 +449,12 @@ class Simulator:
         Returns:
             flag (bool): True if car is in a forbidden area, False otherwise
         """
-        ########
-        # TODO #
-        ########
-        return False
+        flag = False
+        map_val = self.simulated_map.map[self.ground_truth_location[0], self.ground_truth_location[1]]
+        if map_val != 0:
+            flag = True
+
+        return flag
 
     def plot_car(self):
         """
@@ -466,7 +472,12 @@ class Simulator:
         """
         Plots the ground truth path of the car through the environment
         """
-        ########
-        # TODO #
-        ########
-        pass
+        new_map = np.copy(self.simulated_map.map)
+        for path_idx in range(self.path.shape[1]):
+            path = self.path[:, path_idx]
+            for row in np.arange(path[0]-2, path[0]+2):
+                for col in np.arange(path[1]-2, path[1]+2):
+                    new_map[row, col] = 2
+        plt.imshow(new_map)
+        plt.title("Ground Truth Car Path")
+        plt.show()
