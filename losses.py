@@ -1,5 +1,5 @@
 """
-Calculate the reward for the RL network
+Calculate the losses for the networks
 """
 
 ###################
@@ -74,14 +74,50 @@ class Reward:
 
         # Assign rewards to unmapped area
         ground_truth = self.simulator.simulated_map.map
-        for row in reward_size[0]:
-            for col in reward_size[1]:
+        for row in range(reward_size[0]):
+            for col in range(reward_size[1]):
                 # compute the car reading of this spot (if it exists)
                 car_map_idx = None
                 if is_in_map(row, col):
-                    
                     pass
 
                 # Assign reward
 
         return reward
+
+class Loss:
+    """
+    Losses for the classical deep neural nets
+
+    args:
+        sim (Simulator object): simulator that is currently running
+
+    attributes:
+        sim (Simulator object): simulator that is currently running
+    """
+    def __init__(self, sim: simulator.Simulator):
+        self.simulator = sim
+
+    def minimize_unmapped_area(self):
+        """
+        Minimize the unknown and accessible area
+        """
+        # Calculate size of mapped space
+        car_map = self.simulator.car.map
+        mapped_area = car_map.size[0] * car_map.size[1]
+        for row in range(car_map.size[0]):
+            for col in range(car_map.size[1]):
+                if car_map[row, col] == -1:
+                    mapped_area -= 1
+
+        # Calculate size of accessible area
+        ground_truth_map = self.simulator.simulated_map.map
+        ground_truth_map_area = ground_truth_map.size[0] * ground_truth_map.size[1]
+        for row in range(ground_truth_map.size[0]):
+            for col in range(ground_truth_map.size[1]):
+                if ground_truth_map[row, col] == -1:
+                    ground_truth_map_area -= 1
+
+        unmapped_area = ground_truth_map_area - mapped_area
+
+        return unmapped_area
