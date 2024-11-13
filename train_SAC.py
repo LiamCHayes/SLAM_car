@@ -227,7 +227,9 @@ if __name__== "__main__":
             reward_map = rewarder.discover_reward(sim)
 
             # Get action 
-            noise = cn.powerlaw_psd_gaussian(1, episode_len)
+            noise_x = cn.powerlaw_psd_gaussian(1, episode_len)
+            noise_y = cn.powerlaw_psd_gaussian(1, episode_len)
+            noise = torch.tensor([noise_x, noise_y]).to(device)
             action, log_prob = actor_ntw.sample_pink(state, noise[step])
 
             # Execute! Get reward and done bool
