@@ -216,6 +216,8 @@ if __name__== "__main__":
         step = 0
         done = False
         sim = reset_env(map_size, lidar_radius)
+        noise_x = cn.powerlaw_psd_gaussian(1, episode_len)
+        noise_y = cn.powerlaw_psd_gaussian(1, episode_len)
 
         # Episode metrics
         total_reward = 0
@@ -227,10 +229,8 @@ if __name__== "__main__":
             reward_map = rewarder.discover_reward(sim)
 
             # Get action 
-            noise_x = cn.powerlaw_psd_gaussian(1, episode_len)
-            noise_y = cn.powerlaw_psd_gaussian(1, episode_len)
-            noise = torch.tensor([noise_x, noise_y]).to(device)
-            action, log_prob = actor_ntw.sample_pink(state, noise[step])
+            noise = torch.tensor([noise_x[step], noise_y[step]]).to(device)
+            action, log_prob = actor_ntw.sample_pink(state, noise)
 
             # Execute! Get reward and done bool
             no_collision, next_state = sim.step(action, False)
