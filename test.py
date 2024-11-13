@@ -69,10 +69,10 @@ def reward_test():
     while no_collision:
         x = int(input('Row move: '))
         y = int(input('col move: '))
-        loss.discover_reward(sim)
+        loss.discover_sparse(sim, 0.01)
         no_collision = sim.step((x,y), False, plot=True)
         done = not no_collision
-        reward_val = loss.collect_reward(done, sim)
+        reward_val = loss.collect_sparse(done, sim)
         print(reward_val)
         plt.imshow(loss.reward_map)
         plt.show()
@@ -129,5 +129,4 @@ def test_model():
 # Main
 ######
 if __name__ == '__main__':
-    visualize_results()
-    test_model()
+    reward_test()

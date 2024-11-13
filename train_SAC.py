@@ -223,7 +223,7 @@ if __name__== "__main__":
             # Get state and reward map
             curr_state = sim.car.lidar_reading
             state = np_to_tensor(curr_state).unsqueeze(0).to(device)
-            reward_map = rewarder.discover_sparse(sim)
+            reward_map = rewarder.discover_sparse(sim, probability=0.1)
 
             # Get action 
             noise = torch.tensor([noise_x[step], noise_y[step]]).to(device)
