@@ -19,11 +19,13 @@ import SAC_networks
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-parser = argparse.ArgumentParser()
-parser.add_argument("-r", "--resume", action="store_true", help="Whether to resume training or start a new training cycle")
-parser.add_argument("-p", "--pick_up_from", type=str, help="Path to resume from. Format path/to/directory")
-parser.add_argument("-s", "--save_path", type=str, help="Path to save the networks and metrics to. Format path/to/directory")
-args = parser.parse_args()
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-r", "--resume", action="store_true", help="Whether to resume training or start a new training cycle")
+    parser.add_argument("-p", "--pick_up_from", type=str, help="Path to resume from. Format path/to/directory")
+    parser.add_argument("-s", "--save_path", type=str, help="Path to save the networks and metrics to. Format path/to/directory")
+    args = parser.parse_args()
+    return args
 
 ####################
 # Utils for training
@@ -121,59 +123,53 @@ class ReplayBuffer:
         """Return the current size of the buffer."""
         return len(self.buffer)
 
-###################
-# Define parameters
-###################
-# Environment
-lidar_radius = 50
-map_size = (500, 500)
-if args.resume:
-    with open(f'{args.pick_up_from}/reward.pkl', 'rb') as file:
-        rewarder = pickle.load(file)
-else:
-    rewarder = losses.Reward(empty_reward=5, 
-                            obstacle_reward=-3, 
-                            negative_reinforcement=-1)
 
-# Training params
-n_episodes = 10000
-episode_len = 25
-batch_size = 32
-memory_capacity = 1000
-gamma = 0.95
-alpha = 0.2
-target_update_freq = 100
-
-# Networks
-if args.resume:
-    actor_ntw = torch.load(f'{args.pick_up_from}/actor_ntw.pth').to(device)
-    critic_ntw1 = torch.load(f'{args.pick_up_from}/critic_ntw1.pth').to(device)
-    critic_ntw2 = torch.load(f'{args.pick_up_from}/critic_ntw2.pth').to(device)
-    target_critic_ntw1 = torch.load(f'{args.pick_up_from}/target_critic_ntw1.pth').to(device)
-    target_critic_ntw2 = torch.load(f'{args.pick_up_from}/target_critic_ntw2.pth').to(device)
-else:
-    actor_ntw = SAC_networks.Actor(lidar_radius).to(device)
-    critic_ntw1 = SAC_networks.Critic().to(device)
-    critic_ntw2 = SAC_networks.Critic().to(device)
-    target_critic_ntw1 = SAC_networks.Critic().to(device)
-    target_critic_ntw1.load_state_dict(critic_ntw1.state_dict())
-    target_critic_ntw2 = SAC_networks.Critic().to(device)
-    target_critic_ntw2.load_state_dict(critic_ntw2.state_dict())
-
-# Optimizers
-lr = 0.001
-optimizer_A = torch.optim.Adam(actor_ntw.parameters(), lr=lr)
-optimizer_C1 = torch.optim.Adam(critic_ntw1.parameters(), lr=lr)
-optimizer_C2 = torch.optim.Adam(critic_ntw2.parameters(), lr=lr)
-
-# Replay Buffer
-memory = ReplayBuffer(memory_capacity)
-
-##########
-# Training
-##########
 if __name__== "__main__":
-    # Resume training or start from new
+    args = parse_args()
+
+    # Environment
+    lidar_radius = 50
+    map_size = (500, 500)
+    if args.resume:
+        with open(f'{args.pick_up_from}/reward.pkl', 'rb') as file:
+            rewarder = pickle.load(file)
+    else:
+        rewarder = losses.Reward(empty_reward=5, 
+                                obstacle_reward=-3, 
+                                negative_reinforcement=-1)
+
+    # Training params
+    n_episodes = 10000
+    episode_len = 25
+    batch_size = 32
+    memory_capacity = 1000
+    gamma = 0.95
+    alpha = 0.2
+    target_update_freq = 100
+
+    # Networks
+    if args.resume:
+        actor_ntw = torch.load(f'{args.pick_up_from}/actor_ntw.pth').to(device)
+        critic_ntw1 = torch.load(f'{args.pick_up_from}/critic_ntw1.pth').to(device)
+        critic_ntw2 = torch.load(f'{args.pick_up_from}/critic_ntw2.pth').to(device)
+        target_critic_ntw1 = torch.load(f'{args.pick_up_from}/target_critic_ntw1.pth').to(device)
+        target_critic_ntw2 = torch.load(f'{args.pick_up_from}/target_critic_ntw2.pth').to(device)
+    else:
+        actor_ntw = SAC_networks.Actor(lidar_radius).to(device)
+        critic_ntw1 = SAC_networks.Critic().to(device)
+        critic_ntw2 = SAC_networks.Critic().to(device)
+        target_critic_ntw1 = SAC_networks.Critic().to(device)
+        target_critic_ntw1.load_state_dict(critic_ntw1.state_dict())
+        target_critic_ntw2 = SAC_networks.Critic().to(device)
+        target_critic_ntw2.load_state_dict(critic_ntw2.state_dict())
+
+    # Optimizers
+    lr = 1e-4
+    optimizer_A = torch.optim.Adam(actor_ntw.parameters(), lr=lr)
+    optimizer_C1 = torch.optim.Adam(critic_ntw1.parameters(), lr=lr)
+    optimizer_C2 = torch.optim.Adam(critic_ntw2.parameters(), lr=lr)
+
+    # Replay Buffer
     if args.resume:
         # Load the replay buffer
         with open(f'{args.pick_up_from}/memory.pkl', 'rb') as file:
@@ -183,8 +179,8 @@ if __name__== "__main__":
         tot_reward_list = np.load(f"{args.pick_up_from}/tot_reward.npy")
         pct_explored_list = np.load(f"{args.pick_up_from}/pct_explored.npy")
         episode_len_list = np.load(f"{args.pick_up_from}/episode_len.npy")
-        print(tot_reward_list)
     else:
+        memory = ReplayBuffer(memory_capacity)
         # Fill the replay buffer with actions
         while memory.__len__() < batch_size:
             done = False
@@ -211,6 +207,7 @@ if __name__== "__main__":
         pct_explored_list = np.array([])
         episode_len_list = np.array([])
 
+    # Training
     for episode in range(n_episodes):
         # Episode loop variables
         step = 0
@@ -260,10 +257,12 @@ if __name__== "__main__":
 
             optimizer_C1.zero_grad()
             critic1_loss.backward()
+            torch.nn.utils.clip_grad_norm_(critic_ntw1.parameters(), 1)
             optimizer_C1.step()
             
             optimizer_C2.zero_grad()
             critic2_loss.backward()
+            torch.nn.utils.clip_grad_norm_(critic_ntw2.parameters(), 1)
             optimizer_C2.step()
 
             # Update actor
@@ -272,9 +271,15 @@ if __name__== "__main__":
             q2 = critic_ntw2(batch[0], action)
             q = torch.min(q1, q2)
             actor_loss = (alpha * log_prob - q).mean()
+            ## TODO ## 
+            # The q value is very negative
+            # which is making the actor loss very positive 
+            # which is making the covariance matrix very large?
+            # Which is making the mean stay relatively constant?
             
             optimizer_A.zero_grad()
             actor_loss.backward()
+            torch.nn.utils.clip_grad_norm_(actor_ntw.parameters(), 1)
             optimizer_A.step()
 
             # Update episode loop stats

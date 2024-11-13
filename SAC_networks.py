@@ -108,6 +108,8 @@ class Actor(nn.Module):
             noise (bool): whether to add noise or not
         """
         means, cov_matrix = self.forward(x)
+        if torch.isnan(means).any():
+            print(x)
         mvn = MultivariateNormal(means, cov_matrix)
         action = mvn.sample() + noise
         log_prob = mvn.log_prob(action).sum(axis=-1, keepdim=True)

@@ -18,11 +18,13 @@ from train_SAC import np_to_tensor
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-parser = argparse.ArgumentParser()
-parser.add_argument("-p", "--path", type=str, help="Path to model to evaluate. Format path/to/directory")
-parser.add_argument("-r", "--results", action="store_true", help="Show results")
-parser.add_argument("-t", "--test", action="store_true", help="Show test")
-args = parser.parse_args()
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-p", "--path", type=str, help="Path to model to evaluate. Format path/to/directory")
+    parser.add_argument("-r", "--results", action="store_true", help="Show results")
+    parser.add_argument("-t", "--test", action="store_true", help="Show test")
+    args = parser.parse_args()
+    return args
 
 
 ###########
@@ -88,6 +90,7 @@ def test_model(path):
 # Main
 ######
 if __name__ == '__main__':
+    args = parse_args()
     if args.results:
         visualize_results(args.path)
     if args.test:
