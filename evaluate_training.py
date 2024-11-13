@@ -20,6 +20,8 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-p", "--path", type=str, help="Path to model to evaluate. Format path/to/directory")
+parser.add_argument("-r", "--results", action="store_true", help="Show results")
+parser.add_argument("-t", "--test", action="store_true", help="Show test")
 args = parser.parse_args()
 
 
@@ -34,7 +36,6 @@ def visualize_results(path):
     pct_explored = np.load(f"{path}/pct_explored.npy") * 100
     tot_reward = np.load(f"{path}/tot_reward.npy")
 
-    print(ep_len)
     num_timesteps = ep_len.size
 
     plt.plot(np.arange(num_timesteps), tot_reward, label='Reward')
@@ -79,6 +80,7 @@ def test_model(path):
         no_collision, next_state = sim.step(action, False, plot=True)
         total_reward += rewarder.collect_reward(not no_collision, sim)
     
+        print("Action: ", action)
     print("Total reward: ", total_reward)
     
 
@@ -86,5 +88,7 @@ def test_model(path):
 # Main
 ######
 if __name__ == '__main__':
-    visualize_results(args.path)
-    test_model(args.path)
+    if args.results:
+        visualize_results(args.path)
+    if args.test:
+        test_model(args.path)
