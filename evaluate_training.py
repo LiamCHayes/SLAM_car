@@ -23,6 +23,7 @@ def parse_args():
     parser.add_argument("-p", "--path", type=str, help="Path to model to evaluate. Format path/to/directory")
     parser.add_argument("-r", "--results", action="store_true", help="Show results")
     parser.add_argument("-t", "--test", action="store_true", help="Show test")
+    parser.add_argument("-d", "--dqn", action="store_true", help="dqn model show test")
     args = parser.parse_args()
     return args
 
@@ -57,34 +58,75 @@ def test_model(path):
                              obstacle_reward=0, 
                              negative_reinforcement=-1)
 
-    # Create map
-    sim_map = simulator.SimulatedMap(size=(320, 320))
-    sim_map.create_map()
-    sim_map.create_obstacles(np.random.randint(4, 15))
-
-    sim = simulator.Simulator(sim_map)
-    sim.spawn_car(lidar_radius, plot=True)
-
     model = torch.load(f'{path}/actor_ntw.pth').to(device)
     model.eval()  # Set the model to evaluation mode
-    
-    total_reward = 0
-    no_collision = True
-    while no_collision:
-        curr_state = sim.car.lidar_reading
-        state = np_to_tensor(curr_state).unsqueeze(0).to(device)
-        reward_map = rewarder.discover_reward(sim)
 
-        # Get action 
-        action, _ = model.sample(state)
+    while True:
 
-        # Execute! Get reward and done bool
-        no_collision, next_state = sim.step(action, False, plot=True)
-        total_reward += rewarder.collect_reward(not no_collision, sim)
+        # Create map
+        sim_map = simulator.SimulatedMap(size=(320, 320))
+        sim_map.create_map()
+        sim_map.create_obstacles(np.random.randint(4, 15))
+
+        sim = simulator.Simulator(sim_map)
+        sim.spawn_car(lidar_radius, plot=True)
+        
+        total_reward = 0
+        no_collision = True
+        while no_collision:
+            curr_state = sim.car.lidar_reading
+            state = np_to_tensor(curr_state).unsqueeze(0).to(device)
+            reward_map = rewarder.discover_reward(sim)
+
+            # Get action 
+            action, _ = model.sample(state)
+
+            # Execute! Get reward and done bool
+            no_collision, next_state = sim.step(action, False, plot=True)
+            total_reward += rewarder.collect_reward(not no_collision, sim)
+        
+            print("Action: ", action)
+        print("Total reward: ", total_reward)
+        
+def test_model_dqn(path):
+    lidar_radius = 50
+    rewarder = losses.Reward(empty_reward=5, 
+                             obstacle_reward=0, 
+                             negative_reinforcement=-1)
+
+    model = torch.load(f'{path}/policy_net.pth').to(device)
+    model.eval()  # Set the model to evaluation mode
+
+    while True:
+        # Create map
+        sim_map = simulator.SimulatedMap(size=(320, 320))
+        sim_map.create_map()
+        sim_map.create_obstacles(np.random.randint(4, 15))
+
+        sim = simulator.Simulator(sim_map)
+        sim.spawn_car(lidar_radius, plot=True)
     
-        print("Action: ", action)
-    print("Total reward: ", total_reward)
-    
+        total_reward = 0
+        no_collision = True
+        while no_collision:
+            curr_state = sim.car.lidar_reading
+            state = np_to_tensor(curr_state).unsqueeze(0).to(device)
+            reward_map = rewarder.discover_reward(sim)
+
+            # Get action 
+            act_mag = np.floor(lidar_radius * 0.75)
+            actions = [(act_mag, 0), (0, act_mag), (-act_mag, 0), (0, -act_mag),
+                (act_mag, act_mag), (-act_mag, act_mag), (act_mag, -act_mag), (-act_mag, -act_mag)]
+            action_probs = model.forward(state)
+            action_selection = torch.argmax(action_probs).item()
+            action = actions[action_selection]
+
+            # Execute! Get reward and done bool
+            no_collision, next_state = sim.step(action, False, plot=True)
+            total_reward += rewarder.collect_reward(not no_collision, sim)
+        
+            print("Action: ", action)
+        print("Total reward: ", total_reward)
 
 ######
 # Main
@@ -94,4 +136,7 @@ if __name__ == '__main__':
     if args.results:
         visualize_results(args.path)
     if args.test:
-        test_model(args.path)
+        if args.dqn:
+            test_model_dqn(args.path)
+        else:
+            test_model(args.path)

@@ -1,5 +1,5 @@
 """
-Pytorch network
+Pytorch network for SAC
 """
 
 #######

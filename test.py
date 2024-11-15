@@ -10,6 +10,7 @@ import matplotlib
 matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 import torch
+import colorednoise as cn
 
 import simulator
 import losses
@@ -124,9 +125,30 @@ def test_model():
         # Execute! Get reward and done bool
         no_collision, next_state = sim.step(action, False, plot=True)
     
+def test_discrete_noise():
+    episode_len = 25
+    noise_rl = cn.powerlaw_psd_gaussian(1, episode_len)
+    noise_ud = cn.powerlaw_psd_gaussian(1, episode_len)
+    
+    for step in range(episode_len):
+        if noise_rl[step] >= 0:
+            # On a clock: 12, 1:30, 3, 4:30
+            noise_idx = np.arange(8)
+        else: 
+            # On a clock: 6, 7:30, 8, 9:30
+            noise_idx = np.arange(8, 16)
+        if noise_ud[step] >= 0:
+            noise_idx = noise_idx[:4]
+        else:
+            noise_idx = noise_idx[4:]
+        print("noise_rl: ", noise_rl)
+        print("noise_ud: ", noise_ud)
+        print(noise_idx)
+        print(np.random.choice(noise_idx))
+        input("")
 
 ######
 # Main
 ######
 if __name__ == '__main__':
-    reward_test()
+    test_discrete_noise()

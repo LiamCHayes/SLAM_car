@@ -234,7 +234,7 @@ class Reward:
         self.update_simulator(sim)
 
         if done:
-            return -500
+            return -2000
 
         global_coords = self.simulator.get_global_coordinates()
         lidar_radius = self.simulator.car.lidar_radius

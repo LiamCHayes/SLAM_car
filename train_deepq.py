@@ -1,5 +1,5 @@
 """
-Trains the pytorch SAC model
+Trains a discrete pytorch deep q model
 """
 
 #######
@@ -15,7 +15,7 @@ import colorednoise as cn
 
 import simulator
 import losses
-import SAC_networks
+import deep_q_networks
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -66,6 +66,28 @@ def np_to_tensor(arr: np.ndarray):
     tensor = torch.from_numpy(arr)
     tensor = tensor.unsqueeze(0)
     return tensor
+
+def get_pink_noise_discrete(noise_rl, noise_qd):
+    """
+    Discretize two pink noise gaussians to decide what quadrant to move to in exploration
+    
+    args:
+        noise_rl, noise_qd (float): independent samples from a pink noise gaussian distribution
+    """
+    if noise_rl[step] >= 0:
+        # On a clock: 12, 1:30, 3, 4:30
+        noise_idx = np.arange(8)
+    else: 
+        # On a clock: 6, 7:30, 8, 9:30
+        noise_idx = np.arange(8, 16)
+    if noise_qd[step] >= 0:
+        # Choose first quadrant or third quadrant depending on noise_rl
+        noise_idx = noise_idx[:4]
+    else:
+        # Choose second quadrant or fourth quadrant depending on noise_rl
+        noise_idx = noise_idx[4:]
+
+    return noise_idx
 
 class ReplayBuffer:
     """
@@ -123,7 +145,6 @@ class ReplayBuffer:
         """Return the current size of the buffer."""
         return len(self.buffer)
 
-
 if __name__== "__main__":
     args = parse_args()
 
@@ -137,37 +158,47 @@ if __name__== "__main__":
         rewarder = losses.Reward(empty_reward=5, 
                                 obstacle_reward=-3, 
                                 negative_reinforcement=-1)
-
+        
     # Training params
     n_episodes = 10000
     episode_len = 25
     batch_size = 32
     memory_capacity = 1000
-    gamma = 0.95
-    alpha = 0.2
     target_update_freq = 100
+    save_freq = 10
+    gamma = 0.95
+    epsilon = 0.75
 
     # Networks
+    """ DQ1 action set
+    act_mag = np.floor(lidar_radius * 0.75)
+    actions = [(act_mag, 0), (0, act_mag), (-act_mag, 0), (0, -act_mag),
+               (act_mag, act_mag), (-act_mag, act_mag), (act_mag, -act_mag), (-act_mag, -act_mag)]
+    """
+    # DQ2 action set
+    act_mag_big = np.floor(lidar_radius * 0.8)
+    act_mag_small = np.floor(lidar_radius * 0.25)
+    # Actions go around the circle like a clock
+    actions = [(0, act_mag_big), (0, act_mag_small), (act_mag_big, act_mag_big), (act_mag_small, act_mag_small),
+               (act_mag_big, 0), (act_mag_small, 0), (act_mag_big, -act_mag_big), (act_mag_small, -act_mag_small),
+               (0, -act_mag_big), (0, -act_mag_small), (-act_mag_big, -act_mag_big), (-act_mag_small, -act_mag_small),
+               (-act_mag_big, 0), (-act_mag_small, 0), (-act_mag_big, act_mag_big), (-act_mag_small, act_mag_small)]
+    action_size = len(actions)
+
     if args.resume:
-        actor_ntw = torch.load(f'{args.pick_up_from}/actor_ntw.pth').to(device)
-        critic_ntw1 = torch.load(f'{args.pick_up_from}/critic_ntw1.pth').to(device)
-        critic_ntw2 = torch.load(f'{args.pick_up_from}/critic_ntw2.pth').to(device)
-        target_critic_ntw1 = torch.load(f'{args.pick_up_from}/target_critic_ntw1.pth').to(device)
-        target_critic_ntw2 = torch.load(f'{args.pick_up_from}/target_critic_ntw2.pth').to(device)
+        policy_net = torch.load(f'{args.pick_up_from}/policy_net.pth').to(device)
+        target_net1 = torch.load(f'{args.pick_up_from}/target_net1.pth').to(device)
+        # target_net2 = torch.load(f'{args.pick_up_from}/target_net2.pth').to(device)
     else:
-        actor_ntw = SAC_networks.Actor(lidar_radius).to(device)
-        critic_ntw1 = SAC_networks.Critic().to(device)
-        critic_ntw2 = SAC_networks.Critic().to(device)
-        target_critic_ntw1 = SAC_networks.Critic().to(device)
-        target_critic_ntw1.load_state_dict(critic_ntw1.state_dict())
-        target_critic_ntw2 = SAC_networks.Critic().to(device)
-        target_critic_ntw2.load_state_dict(critic_ntw2.state_dict())
+        policy_net = deep_q_networks.DeepQ(action_size).to(device)
+        target_net1 = deep_q_networks.DeepQ(action_size).to(device)
+        target_net1.load_state_dict(policy_net.state_dict())
+        target_net2 = deep_q_networks.DeepQ(action_size).to(device)
+        target_net2.load_state_dict(policy_net.state_dict())
 
     # Optimizers
     lr = 1e-4
-    optimizer_A = torch.optim.Adam(actor_ntw.parameters(), lr=lr)
-    optimizer_C1 = torch.optim.Adam(critic_ntw1.parameters(), lr=lr)
-    optimizer_C2 = torch.optim.Adam(critic_ntw2.parameters(), lr=lr)
+    optimizer = torch.optim.Adam(policy_net.parameters(), lr=lr)
 
     # Replay Buffer
     if args.resume:
@@ -192,16 +223,15 @@ if __name__== "__main__":
                 reward_map = rewarder.discover_reward(sim)
 
                 # Choose random action and go with it
-                row_move = random.randint(-lidar_radius, lidar_radius)
-                col_move = random.randint(-lidar_radius, lidar_radius)
-                action = (row_move, col_move)
+                action_selection = np.random.randint(8)
+                action = actions[action_selection]
 
                 no_collision, next_state = sim.step(action, False)
                 
                 done = not no_collision
                 reward = rewarder.collect_reward(done, sim)
 
-                memory.add(curr_state, action, reward, next_state, done)
+                memory.add(curr_state, action_selection, reward, next_state, done)
 
         # Training loop
         tot_reward_list = np.array([])
@@ -215,8 +245,8 @@ if __name__== "__main__":
         step = 0
         done = False
         sim = reset_env(map_size, lidar_radius)
-        noise_x = cn.powerlaw_psd_gaussian(1, episode_len)
-        noise_y = cn.powerlaw_psd_gaussian(1, episode_len)
+        noise_rl = cn.powerlaw_psd_gaussian(1, episode_len)
+        noise_qd = cn.powerlaw_psd_gaussian(1, episode_len)
 
         # Episode metrics
         total_reward = 0
@@ -228,69 +258,55 @@ if __name__== "__main__":
             state = np_to_tensor(curr_state).unsqueeze(0).to(device)
             reward_map = rewarder.discover_sparse(sim, probability=0.1)
 
-            # Get action 
-            noise = torch.tensor([noise_x[step], noise_y[step]]).to(device)
-            action, log_prob = actor_ntw.sample_pink(state, noise)
+            # Get noise for action (pretty involved because it is colored discrete noise)
+            noise_idx = get_pink_noise_discrete(noise_rl, noise_qd)
 
+            # Get action probabilities
+            action_probs = policy_net.forward(state)
+
+            # Select exploration or exploitation action
+            action_selection = [torch.argmax(action_probs).item(), np.random.choice(noise_idx)]
+            action_selection = np.random.choice(action_selection, 1, p=[1-epsilon, epsilon])
+            act = actions[action_selection]
+            
             # Execute! Get reward and done bool
-            no_collision, next_state = sim.step(action, False)
+            no_collision, next_state = sim.step(act, False)
 
             done = not no_collision
             reward = rewarder.collect_sparse(done, sim)
 
             # Record in memory
-            memory.add(curr_state, action, reward, next_state, done)
+            memory.add(curr_state, action_selection, reward, next_state, done)
 
             # Sample memory
             batch = memory.sample(batch_size)
-            
-            # Update critics
-            with torch.no_grad():
-                next_action, next_log_prob = actor_ntw.sample(batch[3])
-                target_q1 = target_critic_ntw1(batch[3], next_action)
-                target_q2 = target_critic_ntw2(batch[3], next_action)
-                target_q = torch.min(target_q1, target_q2) - alpha * next_log_prob
-                target_q = batch[2] + (1 - batch[4]) * gamma * target_q
-            
-            current_q1 = critic_ntw1(batch[0], batch[1])
-            current_q2 = critic_ntw2(batch[0], batch[1])
-            
-            critic1_loss = torch.nn.functional.mse_loss(current_q1, target_q)
-            critic2_loss = torch.nn.functional.mse_loss(current_q2, target_q)
 
-            optimizer_C1.zero_grad()
-            critic1_loss.backward()
-            torch.nn.utils.clip_grad_norm_(critic_ntw1.parameters(), 1)
-            optimizer_C1.step()
-            
-            optimizer_C2.zero_grad()
-            critic2_loss.backward()
-            torch.nn.utils.clip_grad_norm_(critic_ntw2.parameters(), 1)
-            optimizer_C2.step()
+            # Update
+            current_q = policy_net.forward(batch[0])
+            col_idxs = batch[1].type(torch.int)
+            row_idxs = torch.arange(batch[1].size(0)).to(device)
+            current_q = current_q[row_idxs, col_idxs]
 
-            # Update actor
-            action, log_prob = actor_ntw.sample(batch[0])
-            q1 = critic_ntw1(batch[0], action)
-            q2 = critic_ntw2(batch[0], action)
-            q = torch.min(q1, q2)
-            actor_loss = (alpha * log_prob - q).mean()
-            total_loss += actor_loss
-            ## TODO ## 
-            # The q value is very negative
-            # which is making the actor loss very positive 
-            # which is making the covariance matrix very large?
-            # Which is making the mean stay relatively constant?
-            
-            optimizer_A.zero_grad()
-            actor_loss.backward()
-            torch.nn.utils.clip_grad_norm_(actor_ntw.parameters(), 1)
-            optimizer_A.step()
+            if done:
+                target_q = batch[2]
+            else:
+                target_q = target_net1.forward(batch[3])
+                col_idxs = torch.argmax(target_q, dim=1)    
+                row_idxs = torch.arange(target_q.size(0)).to(device)
+                target_q = batch[2] + gamma * target_q[row_idxs, col_idxs]
+
+            loss = torch.nn.functional.mse_loss(current_q, target_q)
+
+            optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(policy_net.parameters(), 1)
+            optimizer.step()
 
             # Update episode loop stats
             step += 1
             total_reward += reward
-            total_loss += actor_loss
-        
+            total_loss += loss.detach().cpu().numpy()
+
         # Store and print episode stats
         pct_explored = (sim.car.map >= 0).sum() / (sim.simulated_map.map >= 0).sum()
         pct_explored_list = np.append(pct_explored_list, pct_explored)
@@ -299,23 +315,24 @@ if __name__== "__main__":
         loss_list = np.append(loss_list, total_loss)
 
         print("\n")
+        print("Episode number: ", episode)
         print("Episode length: ", step)
         print("Total reward: ", total_reward)
         print("Total loss: ", total_loss)
         print("Percent explored: ", round(pct_explored * 100, 2), "%")
-        
-        # Update target networks and save networks once in a while
+
+        # Update target networks 
         if episode % target_update_freq == 0:
             # Update target networks
-            target_critic_ntw1.load_state_dict(critic_ntw1.state_dict())
-            target_critic_ntw2.load_state_dict(critic_ntw2.state_dict())
+            target_net1.load_state_dict(policy_net.state_dict())
+            #target_net2.load_state_dict(policy_net.state_dict())
 
+        # Save networks and metrics
+        if episode % save_freq == 0:
             # Save networks
-            torch.save(actor_ntw, f"{args.save_path}/actor_ntw.pth")
-            torch.save(critic_ntw1, f"{args.save_path}/critic_ntw1.pth")
-            torch.save(critic_ntw2, f"{args.save_path}/critic_ntw2.pth")
-            torch.save(target_critic_ntw1, f"{args.save_path}/target_critic_ntw1.pth")
-            torch.save(target_critic_ntw2, f"{args.save_path}/target_critic_ntw2.pth")
+            torch.save(policy_net, f"{args.save_path}/policy_net.pth")
+            torch.save(target_net1, f"{args.save_path}/target_net1.pth")
+            #torch.save(target_net2, f"{args.save_path}/target_net2.pth")
 
             # Save loop vals
             np.save(f"{args.save_path}/pct_explored.npy", pct_explored_list)
