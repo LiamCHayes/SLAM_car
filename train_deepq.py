@@ -163,11 +163,11 @@ if __name__== "__main__":
     n_episodes = 10000
     episode_len = 25
     batch_size = 32
-    memory_capacity = 1000
+    memory_capacity = 10000
     target_update_freq = 100
     save_freq = 10
     gamma = 0.95
-    epsilon = 0.75
+    epsilon = 0.6
 
     # Networks
     """ DQ1 action set
@@ -266,7 +266,7 @@ if __name__== "__main__":
 
             # Select exploration or exploitation action
             action_selection = [torch.argmax(action_probs).item(), np.random.choice(noise_idx)]
-            action_selection = np.random.choice(action_selection, 1, p=[1-epsilon, epsilon])
+            action_selection = np.random.choice(action_selection, 1, p=[1-epsilon, epsilon])[0]
             act = actions[action_selection]
             
             # Execute! Get reward and done bool
@@ -315,7 +315,7 @@ if __name__== "__main__":
         loss_list = np.append(loss_list, total_loss)
 
         print("\n")
-        print("Episode number: ", episode)
+        print("Episode ", episode)
         print("Episode length: ", step)
         print("Total reward: ", total_reward)
         print("Total loss: ", total_loss)
