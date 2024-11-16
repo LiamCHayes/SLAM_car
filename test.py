@@ -45,7 +45,7 @@ def simulator_test():
 
     sim = simulator.Simulator(sim_map)
 
-    sim.spawn_car(lidar_radius=15, plot=True)
+    sim.spawn_car(lidar_radius=30, plot=True)
     no_collision = True
     while no_collision:
         x = int(input('Row move: '))
@@ -151,4 +151,4 @@ def test_discrete_noise():
 # Main
 ######
 if __name__ == '__main__':
-    test_discrete_noise()
+    simulator_test()

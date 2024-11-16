@@ -114,9 +114,15 @@ def test_model_dqn(path):
             reward_map = rewarder.discover_reward(sim)
 
             # Get action 
-            act_mag = np.floor(lidar_radius * 0.75)
+            """act_mag = np.floor(lidar_radius * 0.75)
             actions = [(act_mag, 0), (0, act_mag), (-act_mag, 0), (0, -act_mag),
-                (act_mag, act_mag), (-act_mag, act_mag), (act_mag, -act_mag), (-act_mag, -act_mag)]
+               (act_mag, act_mag), (-act_mag, act_mag), (act_mag, -act_mag), (-act_mag, -act_mag)]"""
+            act_mag_big = np.floor(lidar_radius * 0.8)
+            act_mag_small = np.floor(lidar_radius * 0.25)
+            actions = [(0, act_mag_big), (0, act_mag_small), (act_mag_big, act_mag_big), (act_mag_small, act_mag_small),
+               (act_mag_big, 0), (act_mag_small, 0), (act_mag_big, -act_mag_big), (act_mag_small, -act_mag_small),
+               (0, -act_mag_big), (0, -act_mag_small), (-act_mag_big, -act_mag_big), (-act_mag_small, -act_mag_small),
+               (-act_mag_big, 0), (-act_mag_small, 0), (-act_mag_big, act_mag_big), (-act_mag_small, act_mag_small)]
             action_probs = model.forward(state)
             action_selection = torch.argmax(action_probs).item()
             action = actions[action_selection]

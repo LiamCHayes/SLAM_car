@@ -291,12 +291,54 @@ class Car:
         """
         lidar_reading = np.full((self.lidar_radius*2+1, self.lidar_radius*2+1), -1)
 
-        # Loop through indices and record ones that are within radius
+        # Loop through indices and record the lidar reading
+        theta_list = np.array([])
+        r_list = np.array([])
+        li_idx_list = []
+        gt_list = []
         for li_row, row in enumerate(np.arange(ground_truth_location[0]-self.lidar_radius, ground_truth_location[0]+self.lidar_radius+1)):
             for li_col, col in enumerate(np.arange(ground_truth_location[1]-self.lidar_radius, ground_truth_location[1]+self.lidar_radius+1)):
-                distance = ((row-ground_truth_location[0])**2 + (col-ground_truth_location[1])**2)**0.5
-                if distance <= self.lidar_radius:
-                    lidar_reading[li_row, li_col] = ground_truth_map.map[row, col]
+                # Calculate theta and r
+                x = li_col - self.lidar_radius
+                y = self.lidar_radius - li_row
+                theta = np.arctan2(y, x)
+                r = (x**2 + y**2)**0.5
+                
+                theta_list = np.append(theta_list,theta)
+                r_list = np.append(r_list,r)
+                li_idx_list.append((li_row, li_col))
+                gt_list.append((row, col))
+
+        gt_list = np.array(gt_list)
+        li_idx_list = np.array(li_idx_list)
+        for i, li_idx in enumerate(li_idx_list):
+            theta = theta_list[i]
+            r = r_list[i]
+
+            # Get ground truth locations that have theta similar to this theta and r less than this r
+            epsilon = 0.1
+            mask = theta-epsilon < theta_list
+            theta_similar = theta_list[mask]
+            matching_r = r_list[mask]
+            matching_gt = gt_list[mask]
+            mask2 = theta_similar < theta+epsilon
+            theta_similar = theta_similar[mask2]
+            matching_r = matching_r[mask2]
+            matching_gt = matching_gt[mask2]
+            mask3 = matching_r <= r
+            matching_r = matching_r[mask3]
+            matching_gt = matching_gt[mask3]
+
+            # List of ground truth values satisfying conditions
+            values = np.array([])
+            for gt in matching_gt:
+                values = np.append(values, ground_truth_map.map[gt[0], gt[1]])
+            
+            # Set this lidar reading value
+            if values[values > 0].any():
+                lidar_reading[li_idx[0], li_idx[1]] = -1
+            else:
+               lidar_reading[li_idx[0], li_idx[1]] = 0
 
         self.lidar_reading = lidar_reading
         return lidar_reading
