@@ -12,12 +12,12 @@ class Planner:
     3.) Calibrate and convert distance to time
     4.) Controller car passes drive commands
     """
-    def __init__(self, x_start, x_goal):
+    def __init__(self, xstart, xgoal):
         """
         1.) Initialize Variables
         """
-        self.x_start = x_start
-        self.x_goal = x_goal
+        self.x_start = xstart
+        self.x_goal = xgoal
 
     def rect_to_polar(self):
         """
@@ -31,6 +31,24 @@ class Planner:
         polar_coords = np.array([[radius],[theta]])
 
         return polar_coords
+    
+    def dist_to_time(self):
+        """
+        Lower level planner to convert distance and angle into time.
+        This sends the robot from its current position to goal position.
+        """
+        polar_coords = self.rect_to_polar()
+        # distance/time constant calculated by calibration 
+        # eventually automatic protocol currently manual
+        time_constant = 1
+        radius_time = polar_coords[0] * time_constant
+        angle_time = polar_coords[1] * time_constant
+        time_coords = np.array([[radius_time],[angle_time]])
+        
+        return time_coords
+    
+    def controller(self):
+        pass
 
 if __name__ == '__main__':
     x_start = np.array([[0],[0]])
