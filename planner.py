@@ -31,23 +31,26 @@ class Planner:
         polar_coords = np.array([[radius],[theta]])
 
         return polar_coords
-    
+
     def dist_to_time(self):
         """
         Lower level planner to convert distance and angle into time.
         This sends the robot from its current position to goal position.
         """
         polar_coords = self.rect_to_polar()
-        # distance/time constant calculated by calibration 
+        # distance/time constant calculated by calibration
         # eventually automatic protocol currently manual
         time_constant = 1
         radius_time = polar_coords[0] * time_constant
         angle_time = polar_coords[1] * time_constant
         time_coords = np.array([[radius_time],[angle_time]])
-        
+
         return time_coords
-    
+
     def controller(self):
+        """
+        Controller Function (Looking at voltage reduction to prevent overshooting)
+        """
         pass
 
 if __name__ == '__main__':
