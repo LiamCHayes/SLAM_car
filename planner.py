@@ -1,8 +1,8 @@
 """
 Planner Function: Low Level Planner to drive robot between xstart to xgoal
 """
-import numpy as np
 import math
+import numpy as np
 
 class Planner:
     """
