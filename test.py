@@ -151,4 +151,4 @@ def test_discrete_noise():
 # Main
 ######
 if __name__ == '__main__':
-    simulator_test()
+    reward_test()

@@ -104,7 +104,7 @@ class ReplayBuffer:
         self.buffer = deque(maxlen=capacity)
         self.capacity = capacity
 
-    def add(self, state, action, reward, next_state, done, previous_action):
+    def add(self, state, action, reward, next_state, done, path):
         """Add a new experience to the buffer."""
         # Give states a channel to input into the network
         state = state[np.newaxis, :]
@@ -118,7 +118,7 @@ class ReplayBuffer:
             action = tuple(action)
         
         # Add to buffer
-        experience = (state, action, reward, next_state, done, previous_action)
+        experience = (state, action, reward, next_state, done, path)
         self.buffer.append(experience)
 
     def sample(self, batch_size):
@@ -128,11 +128,17 @@ class ReplayBuffer:
             a batch of (state, action, reward, next_state, done)
         """
         batch = random.sample(self.buffer, batch_size)
-        states, actions, rewards, next_states, dones, previous_actions = zip(*batch)
-        print(states)
+        states, actions, rewards, next_states, dones, paths = zip(*batch)
         states = np.array(states)
         next_states = np.array(next_states)
-        print(previous_actions)
+
+        # Pad paths
+        paths_padded = []
+        for p_idx in range(len(paths)):
+            p = paths[p_idx]
+            pad_size = 25 - p.shape[1]
+            p_padded = np.pad(p, ((0, 0), (0, pad_size)), mode='constant')
+            paths_padded.append(p_padded)
 
         # Convert to PyTorch tensors
         return (
@@ -141,7 +147,7 @@ class ReplayBuffer:
             torch.tensor(rewards, dtype=torch.float32).to(device),
             torch.tensor(next_states, dtype=torch.float32).to(device),
             torch.tensor(dones, dtype=torch.float32).to(device),
-            torch.tensor(previous_actions, dtype=torch.float32).to(device)
+            torch.tensor(paths, dtype=torch.float32).to(device)
         )
 
     def __len__(self):
@@ -152,8 +158,8 @@ if __name__== "__main__":
     args = parse_args()
 
     # Environment
-    lidar_radius = 50
-    map_size = (500, 500)
+    lidar_radius = 10
+    map_size = (100, 100)
     if args.resume:
         with open(f'{args.pick_up_from}/reward.pkl', 'rb') as file:
             rewarder = pickle.load(file)
@@ -193,10 +199,10 @@ if __name__== "__main__":
         target_net1 = torch.load(f'{args.pick_up_from}/target_net1.pth').to(device)
         # target_net2 = torch.load(f'{args.pick_up_from}/target_net2.pth').to(device)
     else:
-        policy_net = deep_q_networks.DeepQ_ST(action_size).to(device)
-        target_net1 = deep_q_networks.DeepQ_ST(action_size).to(device)
+        policy_net = deep_q_networks.DeepQ_ST(action_size, episode_len).to(device)
+        target_net1 = deep_q_networks.DeepQ_ST(action_size, episode_len).to(device)
         target_net1.load_state_dict(policy_net.state_dict())
-        target_net2 = deep_q_networks.DeepQ_ST(action_size).to(device)
+        target_net2 = deep_q_networks.DeepQ_ST(action_size, episode_len).to(device)
         target_net2.load_state_dict(policy_net.state_dict())
 
     # Optimizers
@@ -220,7 +226,7 @@ if __name__== "__main__":
         while memory.__len__() < batch_size:
             done = False
             sim = reset_env(map_size, lidar_radius)
-            previous_action = torch.tensor([0, 0])
+            path = sim.car.path
 
             while not done and memory.__len__() < batch_size:
                 curr_state = sim.car.lidar_reading
@@ -235,8 +241,8 @@ if __name__== "__main__":
                 done = not no_collision
                 reward = rewarder.collect_reward(done, sim)
 
-                memory.add(curr_state, action_selection, reward, next_state, done, previous_action)
-                previous_action = action
+                memory.add(curr_state, action_selection, reward, next_state, done, path)
+                path = sim.car.path
 
         # Training loop
         tot_reward_list = np.array([])
@@ -256,19 +262,20 @@ if __name__== "__main__":
         # Episode metrics
         total_reward = 0
         total_loss = 0
-        previous_action = torch.tensor([[0, 0]]).to(device)
+        path = sim.car.path
 
         while not done and step < episode_len:
             # Get state and reward map
             curr_state = sim.car.lidar_reading
             state = np_to_tensor(curr_state).unsqueeze(0).to(device)
+            path_tensor = torch.tensor(path, dtype=torch.float32).unsqueeze(0).to(device)
             reward_map = rewarder.discover_sparse(sim, probability=0.01)
 
             # Get noise for action (pretty involved because it is colored discrete noise)
             noise_idx = get_pink_noise_discrete(noise_rl, noise_qd)
 
             # Get action probabilities
-            action_probs = policy_net.forward(state, previous_action)
+            action_probs = policy_net.forward(state, path_tensor)
 
             # Select exploration or exploitation action
             action_selection = [torch.argmax(action_probs).item(), np.random.choice(noise_idx)]
@@ -282,8 +289,8 @@ if __name__== "__main__":
             reward = rewarder.collect_sparse(done, sim)
 
             # Record in memory
-            memory.add(curr_state, action_selection, reward, next_state, done, previous_action)
-            previous_action = act
+            memory.add(curr_state, action_selection, reward, next_state, done, path)
+            path = sim.car.path
 
             # Sample memory
             batch = memory.sample(batch_size)
@@ -297,7 +304,7 @@ if __name__== "__main__":
             if done:
                 target_q = batch[2]
             else:
-                target_q = target_net1.forward(batch[3], batch[1])
+                target_q = target_net1.forward(batch[3], batch[5])
                 col_idxs = torch.argmax(target_q, dim=1)    
                 row_idxs = torch.arange(target_q.size(0)).to(device)
                 target_q = batch[2] + gamma * target_q[row_idxs, col_idxs]
