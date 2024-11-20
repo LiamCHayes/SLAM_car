@@ -147,7 +147,7 @@ class ReplayBuffer:
             torch.tensor(rewards, dtype=torch.float32).to(device),
             torch.tensor(next_states, dtype=torch.float32).to(device),
             torch.tensor(dones, dtype=torch.float32).to(device),
-            torch.tensor(paths, dtype=torch.float32).to(device)
+            torch.tensor(paths_padded, dtype=torch.float32).to(device)
         )
 
     def __len__(self):
@@ -158,8 +158,8 @@ if __name__== "__main__":
     args = parse_args()
 
     # Environment
-    lidar_radius = 10
-    map_size = (100, 100)
+    lidar_radius = 50
+    map_size = (500, 500)
     if args.resume:
         with open(f'{args.pick_up_from}/reward.pkl', 'rb') as file:
             rewarder = pickle.load(file)
@@ -171,12 +171,12 @@ if __name__== "__main__":
     # Training params
     n_episodes = 10000
     episode_len = 25
-    batch_size = 2
-    memory_capacity = 10000
+    batch_size = 32
+    memory_capacity = 1000
     target_update_freq = 100
     save_freq = 10
     gamma = 0.95
-    epsilon = 0.4
+    epsilon = 0.7
 
     # Networks
     #DQ1 action set
