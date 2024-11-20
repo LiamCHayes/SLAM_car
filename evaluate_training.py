@@ -101,7 +101,7 @@ def test_model_dqn(path):
         # Create map
         sim_map = simulator.SimulatedMap(size=(320, 320))
         sim_map.create_map()
-        sim_map.create_obstacles(np.random.randint(4, 15))
+        #sim_map.create_obstacles(np.random.randint(4, 15))
 
         sim = simulator.Simulator(sim_map)
         sim.spawn_car(lidar_radius, plot=True)
@@ -116,13 +116,16 @@ def test_model_dqn(path):
             # Get action 
             """act_mag = np.floor(lidar_radius * 0.75)
             actions = [(act_mag, 0), (0, act_mag), (-act_mag, 0), (0, -act_mag),
-               (act_mag, act_mag), (-act_mag, act_mag), (act_mag, -act_mag), (-act_mag, -act_mag)]"""
-            act_mag_big = np.floor(lidar_radius * 0.8)
+                (act_mag, act_mag), (-act_mag, act_mag), (act_mag, -act_mag), (-act_mag, -act_mag)]"""
+            """act_mag_big = np.floor(lidar_radius * 0.8)
             act_mag_small = np.floor(lidar_radius * 0.25)
             actions = [(0, act_mag_big), (0, act_mag_small), (act_mag_big, act_mag_big), (act_mag_small, act_mag_small),
-               (act_mag_big, 0), (act_mag_small, 0), (act_mag_big, -act_mag_big), (act_mag_small, -act_mag_small),
-               (0, -act_mag_big), (0, -act_mag_small), (-act_mag_big, -act_mag_big), (-act_mag_small, -act_mag_small),
-               (-act_mag_big, 0), (-act_mag_small, 0), (-act_mag_big, act_mag_big), (-act_mag_small, act_mag_small)]
+                (act_mag_big, 0), (act_mag_small, 0), (act_mag_big, -act_mag_big), (act_mag_small, -act_mag_small),
+                (0, -act_mag_big), (0, -act_mag_small), (-act_mag_big, -act_mag_big), (-act_mag_small, -act_mag_small),
+                (-act_mag_big, 0), (-act_mag_small, 0), (-act_mag_big, act_mag_big), (-act_mag_small, act_mag_small)]"""
+            act_mag = np.floor(lidar_radius * 0.75)
+            actions = [(0, act_mag), (act_mag, act_mag), (act_mag, 0), (act_mag, -act_mag), 
+                (0, -act_mag), (-act_mag, -act_mag), (-act_mag, 0), (-act_mag, act_mag)]
             action_probs = model.forward(state)
             action_selection = torch.argmax(action_probs).item()
             action = actions[action_selection]
