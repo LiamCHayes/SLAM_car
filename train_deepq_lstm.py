@@ -176,7 +176,7 @@ if __name__== "__main__":
     target_update_freq = 100
     save_freq = 10
     gamma = 0.95
-    epsilon = 0.7
+    epsilon = 0.5
 
     # Networks
     #DQ1 action set
