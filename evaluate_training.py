@@ -24,6 +24,7 @@ def parse_args():
     parser.add_argument("-r", "--results", action="store_true", help="Show results")
     parser.add_argument("-t", "--test", action="store_true", help="Show test")
     parser.add_argument("-d", "--dqn", action="store_true", help="dqn model show test")
+    parser.add_argument("-l", "--lstm", action="store_true", help="lstm model show test")
     args = parser.parse_args()
     return args
 
@@ -47,9 +48,13 @@ def visualize_results(path):
     plt.show()
 
     plt.plot(np.arange(num_timesteps), ep_len, label='Episode_length')
+    plt.legend()
+    plt.title("Episode Length")
+    plt.show()
+
     plt.plot(np.arange(num_timesteps), pct_explored, label='Percent_area_explored')
     plt.legend()
-    plt.title("Episode Length and Percent Explored")
+    plt.title("Percent Explored")
     plt.show()
 
 def test_model(path):
@@ -127,6 +132,59 @@ def test_model_dqn(path):
             actions = [(0, act_mag), (act_mag, act_mag), (act_mag, 0), (act_mag, -act_mag), 
                 (0, -act_mag), (-act_mag, -act_mag), (-act_mag, 0), (-act_mag, act_mag)]
             action_probs = model.forward(state)
+            action_selection = torch.argmax(action_probs).item()
+            action = actions[action_selection]
+
+            # Execute! Get reward and done bool
+            no_collision, next_state = sim.step(action, False, plot=True)
+            total_reward += rewarder.collect_reward(not no_collision, sim)
+        
+            print("Action: ", action)
+        print("Total reward: ", total_reward)
+
+def test_model_lstm(path):
+    lidar_radius = 50
+    rewarder = losses.Reward(empty_reward=5, 
+                             obstacle_reward=0, 
+                             negative_reinforcement=-1)
+
+    model = torch.load(f'{path}/policy_net.pth').to(device)
+    model.eval()  # Set the model to evaluation mode
+
+    while True:
+        # Create map
+        sim_map = simulator.SimulatedMap(size=(320, 320))
+        sim_map.create_map()
+        #sim_map.create_obstacles(np.random.randint(4, 15))
+
+        sim = simulator.Simulator(sim_map)
+        sim.spawn_car(lidar_radius, plot=True)
+    
+        total_reward = 0
+        no_collision = True
+        while no_collision:
+            curr_state = sim.car.lidar_reading
+            state = np_to_tensor(curr_state).unsqueeze(0).to(device)
+            reward_map = rewarder.discover_reward(sim)
+
+            # Get path in the right format
+            path = sim.car.path
+            path_tensor = torch.tensor(path, dtype=torch.float32).unsqueeze(0).to(device)
+
+            # Get action 
+            """act_mag = np.floor(lidar_radius * 0.75)
+            actions = [(act_mag, 0), (0, act_mag), (-act_mag, 0), (0, -act_mag),
+                (act_mag, act_mag), (-act_mag, act_mag), (act_mag, -act_mag), (-act_mag, -act_mag)]"""
+            """act_mag_big = np.floor(lidar_radius * 0.8)
+            act_mag_small = np.floor(lidar_radius * 0.25)
+            actions = [(0, act_mag_big), (0, act_mag_small), (act_mag_big, act_mag_big), (act_mag_small, act_mag_small),
+                (act_mag_big, 0), (act_mag_small, 0), (act_mag_big, -act_mag_big), (act_mag_small, -act_mag_small),
+                (0, -act_mag_big), (0, -act_mag_small), (-act_mag_big, -act_mag_big), (-act_mag_small, -act_mag_small),
+                (-act_mag_big, 0), (-act_mag_small, 0), (-act_mag_big, act_mag_big), (-act_mag_small, act_mag_small)]"""
+            act_mag = np.floor(lidar_radius * 0.75)
+            actions = [(0, act_mag), (act_mag, act_mag), (act_mag, 0), (act_mag, -act_mag), 
+                (0, -act_mag), (-act_mag, -act_mag), (-act_mag, 0), (-act_mag, act_mag)]
+            action_probs = model.forward(state, path_tensor)
             action_selection = torch.argmax(action_probs).item()
             action = actions[action_selection]
 
