@@ -205,5 +205,7 @@ if __name__ == '__main__':
     if args.test:
         if args.dqn:
             test_model_dqn(args.path)
+        elif args.lstm:
+            test_model_lstm(args.path)
         else:
             test_model(args.path)
