@@ -76,16 +76,16 @@ def get_pink_noise_discrete(noise_rl, noise_qd):
     """
     if noise_rl[step] >= 0:
         # On a clock: 12, 1:30, 3, 4:30
-        noise_idx = np.arange(8)
+        noise_idx = np.arange(4)
     else: 
         # On a clock: 6, 7:30, 8, 9:30
-        noise_idx = np.arange(8, 16)
+        noise_idx = np.arange(4, 8)
     if noise_qd[step] >= 0:
         # Choose first quadrant or third quadrant depending on noise_rl
-        noise_idx = noise_idx[:4]
+        noise_idx = noise_idx[:2]
     else:
         # Choose second quadrant or fourth quadrant depending on noise_rl
-        noise_idx = noise_idx[4:]
+        noise_idx = noise_idx[2:]
 
     return noise_idx
 
@@ -167,7 +167,7 @@ if __name__== "__main__":
     target_update_freq = 100
     save_freq = 10
     gamma = 0.95
-    epsilon = 0.6
+    epsilon = 0.7
 
     # Networks
     # Action set
