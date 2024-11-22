@@ -169,14 +169,14 @@ if __name__== "__main__":
                                 negative_reinforcement=-1)
         
     # Training params
-    n_episodes = 10000
+    n_episodes = 137
     episode_len = 25
     batch_size = 32
     memory_capacity = 1000
     target_update_freq = 100
     save_freq = 10
     gamma = 0.95
-    epsilon = 0.25
+    epsilon = 0.7
 
     # Networks
     #DQ1 action set

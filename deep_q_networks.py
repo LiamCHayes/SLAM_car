@@ -34,7 +34,8 @@ class DeepQ(nn.Module):
             nn.ReLU(),
             nn.Linear(256, 128),
             nn.ReLU(),
-            nn.Linear(128, action_size)
+            nn.Linear(128, action_size),
+            nn.Softmax()
         )
 
     def forward(self, state):
@@ -79,7 +80,8 @@ class DeepQ_ST(nn.Module):
             nn.ReLU(),
             nn.Linear(256, 128),
             nn.ReLU(),
-            nn.Linear(128, action_size)
+            nn.Linear(128, action_size),
+            nn.Softmax()
         )
 
     def forward(self, state, path):

@@ -11,6 +11,7 @@ matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 import torch
 import colorednoise as cn
+import pandas as pd
 
 import simulator
 import losses
@@ -147,8 +148,17 @@ def test_discrete_noise():
         print(np.random.choice(noise_idx))
         input("")
 
+def get_data(data_path, save_path):
+    ep_len = np.load(f"{data_path}/episode_len.npy")
+    pct_explored = np.load(f"{data_path}/pct_explored.npy") * 100
+    tot_reward = np.load(f"{data_path}/tot_reward.npy")
+    loss = np.load(f'{data_path}/tot_loss.npy')
+    data = {'loss' : loss, 'reward' : tot_reward, 'pct_explored' : pct_explored, 'ep_len' : ep_len}
+    df = pd.DataFrame(data)
+    df.to_csv(save_path, index=True)
+
 ######
 # Main
 ######
 if __name__ == '__main__':
-    simulator_test()
+    get_data('models/DQ_pink3', 'training_data/DQ_pink3.csv')

@@ -106,7 +106,7 @@ def test_model_dqn(path):
         # Create map
         sim_map = simulator.SimulatedMap(size=(320, 320))
         sim_map.create_map()
-        #sim_map.create_obstacles(np.random.randint(4, 15))
+        sim_map.create_obstacles(np.random.randint(4, 15))
 
         sim = simulator.Simulator(sim_map)
         sim.spawn_car(lidar_radius, plot=True)
@@ -135,11 +135,12 @@ def test_model_dqn(path):
             action_selection = torch.argmax(action_probs).item()
             action = actions[action_selection]
 
+            print("Action: ", action)
+
             # Execute! Get reward and done bool
             no_collision, next_state = sim.step(action, False, plot=True)
             total_reward += rewarder.collect_reward(not no_collision, sim)
-        
-            print("Action: ", action)
+
         print("Total reward: ", total_reward)
 
 def test_model_lstm(path):
