@@ -1,5 +1,7 @@
 """
-High-level planner - gets action from the neural net
+High-level planner
+
+Gets action from the neural net
 
 Put the model in the same directory as this script
 """
