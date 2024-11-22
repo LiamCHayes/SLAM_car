@@ -21,10 +21,9 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--path", type=str, help="Path to model to evaluate. Format path/to/directory")
+    parser.add_argument("-m", "--model", type=str, help="Model number. 1 sac, 2 dqn, 3 lstm, 4 dqn limited")
     parser.add_argument("-r", "--results", action="store_true", help="Show results")
     parser.add_argument("-t", "--test", action="store_true", help="Show test")
-    parser.add_argument("-d", "--dqn", action="store_true", help="dqn model show test")
-    parser.add_argument("-l", "--lstm", action="store_true", help="lstm model show test")
     args = parser.parse_args()
     return args
 
@@ -196,6 +195,54 @@ def test_model_lstm(path):
             print("Action: ", action)
         print("Total reward: ", total_reward)
 
+def test_model_dqn_limited(path):
+    lidar_radius = 50
+    rewarder = losses.Reward(empty_reward=5, 
+                             obstacle_reward=0, 
+                             negative_reinforcement=-1)
+
+    model = torch.load(f'{path}/policy_net.pth').to(device)
+    model.eval()  # Set the model to evaluation mode
+
+    while True:
+        # Create map
+        sim_map = simulator.SimulatedMap(size=(320, 320))
+        sim_map.create_map()
+        sim_map.create_obstacles(np.random.randint(4, 15))
+
+        sim = simulator.Simulator(sim_map)
+        sim.spawn_car(lidar_radius, plot=True)
+    
+        total_reward = 0
+        no_collision = True
+        prev_act_selection = None
+        while no_collision:
+            curr_state = sim.car.lidar_reading
+            state = np_to_tensor(curr_state).unsqueeze(0).to(device)
+            reward_map = rewarder.discover_reward(sim)
+
+            # Define action set 
+            act_mag = np.floor(lidar_radius * 0.75)
+            actions = [(0, act_mag), (act_mag, act_mag), (act_mag, 0), (act_mag, -act_mag), 
+                (0, -act_mag), (-act_mag, -act_mag), (-act_mag, 0), (-act_mag, act_mag)]
+            
+            # Get action (exclude the opposite action to avoid going in circles)
+            action_probs = model.forward(state)
+            if prev_act_selection is not None:
+                zero_action = prev_act_selection + 4 if prev_act_selection < 4 else prev_act_selection - 4
+                action_probs[0, zero_action] = 0
+            action_selection = torch.argmax(action_probs).item()
+            action = actions[action_selection]
+
+            print("Action: ", action)
+
+            # Execute! Get reward and done bool
+            no_collision, next_state = sim.step(action, False, plot=True)
+            total_reward += rewarder.collect_reward(not no_collision, sim)
+
+        print("Total reward: ", total_reward)
+
+
 ######
 # Main
 ######
@@ -204,9 +251,12 @@ if __name__ == '__main__':
     if args.results:
         visualize_results(args.path)
     if args.test:
-        if args.dqn:
-            test_model_dqn(args.path)
-        elif args.lstm:
-            test_model_lstm(args.path)
-        else:
+        if args.model == 1:
             test_model(args.path)
+        elif args.model == 2:
+            test_model_dqn(args.path)
+        elif args.model == 3:
+            test_model_lstm(args.path)
+        elif args.model == 4:
+            test_model_dqn_limited(args.path)
+            

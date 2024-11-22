@@ -3,11 +3,11 @@ library(ggplot2)
 library(dplyr)
 
 # Load data
-df <- read.csv('training_data/DQ_pink3.csv')
+df <- read.csv('training_data/DQ_pink4.csv')
 
 # Plots
 ggplot(data=df) +
-    geom_point(aes(x=X, y=pct_explored)) 
+    geom_point(aes(x=X, y=loss)) 
 
 # Statistics
 df %>%
