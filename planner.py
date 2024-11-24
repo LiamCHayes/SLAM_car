@@ -2,9 +2,9 @@
 Planner Function: Low Level Planner to drive robot between xstart to xgoal
 """
 import math
+from time import sleep
 import numpy as np
 from gpiozero import Motor
-from time import sleep
 
 class Planner:
     """
