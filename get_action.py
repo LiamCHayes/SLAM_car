@@ -4,6 +4,11 @@ High-level planner
 Gets action from the neural net
 
 Put the model in the same directory as this script
+
+action_selector = ActionSelection(action_magnitude = 600)
+input_reading = action_selector.transform_lidar(angle_min, angle_increment, ranges)
+action = action_selector.get_action(input_reading)
+
 """
 
 import torch
@@ -86,8 +91,8 @@ class ActionSelection:
 
         # Convert form polar readings to numpy array
         npoints = len(thetas)
-        lidar_reading = np.zeros((801, 801))
-        np_origin = 400
+        lidar_reading = np.zeros((1601, 1601))
+        np_origin = 800
         r_matrix, theta_matrix = self._get_polar_matrices(np_origin)
         for i in range(npoints):
             r = rs[i]
