@@ -157,8 +157,35 @@ def get_data(data_path, save_path):
     df = pd.DataFrame(data)
     df.to_csv(save_path, index=True)
 
+def get_polar_matrices(np_origin):
+    r_matrix = np.zeros((np_origin*2+1, np_origin*2+1))
+    theta_matrix = np.zeros((np_origin*2+1, np_origin*2+1))
+    for row in range(r_matrix.shape[0]):
+        for col in range(r_matrix.shape[1]):
+            x = col - np_origin
+            y = -(row - np_origin)
+            r_matrix[row, col] = round((x**2 + y**2) ** 0.5)
+            if x != 0:
+                if x > 0 and y > 0:
+                    theta_matrix[row, col] = np.arctan(y/x)
+                elif x < 0:
+                    theta_matrix[row, col] = np.arctan(y/x) + np.pi
+                elif x > 0 and y < 0:
+                    theta_matrix[row, col] = np.arctan(y/x) + np.pi * 2
+            else:
+                if y > 0:
+                    theta_matrix[row, col] = np.pi/2
+                elif y < 0:
+                    theta_matrix[row, col] = 3*np.pi/2
+    
+    return r_matrix, theta_matrix
+
 ######
 # Main
 ######
 if __name__ == '__main__':
-    get_data('models/DQ_pink3', 'training_data/DQ_pink3.csv')
+    r, theta = get_polar_matrices(5)
+    print('\n')
+    print(r)
+    print('\n')
+    print(theta)
