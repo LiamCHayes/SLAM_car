@@ -3,6 +3,8 @@ Planner Function: Low Level Planner to drive robot between xstart to xgoal
 """
 import math
 import numpy as np
+from gpiozero import Motor
+from time import sleep
 
 class Planner:
     """
@@ -51,10 +53,24 @@ class Planner:
         """
         Controller Function (Looking at voltage reduction to prevent overshooting)
         """
-        pass
+        h_bridge_1 = Motor(17,18)
+        h_bridge_2 = Motor(20,21)
 
-if __name__ == '__main__':
-    x_start = np.array([[0],[0]])
-    x_goal = np.array([[1],[1]])
-    planner = Planner(x_start, x_goal)
-    print(planner.rect_to_polar())
+        time_duration = self.dist_to_time()
+        #Rotation
+        h_bridge_1.backward()
+        h_bridge_2.forward()
+        sleep(time_duration[1])
+
+        h_bridge_1.stop()
+        h_bridge_2.stop()
+        sleep(1)
+
+        #Forward
+        h_bridge_1.forward()
+        h_bridge_2.forward()
+        sleep(time_duration[0])
+
+        h_bridge_1.stop()
+        h_bridge_2.stop()
+        sleep(1)
