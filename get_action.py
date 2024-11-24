@@ -5,6 +5,7 @@ Gets action from the neural net
 
 Put the model in the same directory as this script
 
+EXAMPLE: 
 action_selector = ActionSelection(action_magnitude = 600)
 input_reading = action_selector.transform_lidar(angle_min, angle_increment, ranges)
 action = action_selector.get_action(input_reading)
