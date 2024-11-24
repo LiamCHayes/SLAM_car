@@ -233,6 +233,7 @@ def test_model_dqn_limited(path):
                 action_probs[0, zero_action] = 0
             action_selection = torch.argmax(action_probs).item()
             action = actions[action_selection]
+            prev_act_selection = action_selection
 
             print("Action: ", action)
 
@@ -251,12 +252,12 @@ if __name__ == '__main__':
     if args.results:
         visualize_results(args.path)
     if args.test:
-        if args.model == 1:
+        if int(args.model) == 1:
             test_model(args.path)
-        elif args.model == 2:
+        elif int(args.model) == 2:
             test_model_dqn(args.path)
-        elif args.model == 3:
+        elif int(args.model) == 3:
             test_model_lstm(args.path)
-        elif args.model == 4:
+        elif int(args.model) == 4:
             test_model_dqn_limited(args.path)
             
