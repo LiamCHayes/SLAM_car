@@ -12,6 +12,8 @@ import matplotlib.pyplot as plt
 import torch
 import colorednoise as cn
 import pandas as pd
+import time
+from deep_q_networks import DeepQ
 
 import simulator
 import losses
@@ -29,10 +31,10 @@ def simulate_map_test():
     """
     for i in range(10):
         print(f'Map {i + 1} generated')
-        simulator = simulator.SimulatedMap(size=(320, 320))
-        simulator.create_map()
-        simulator.create_obstacles(np.random.randint(4, 15))
-        plt.imshow(simulator.map)
+        sim = simulator.SimulatedMap(size=(320, 320))
+        sim.create_map()
+        sim.create_obstacles(np.random.randint(4, 15))
+        plt.imshow(sim.map)
         plt.show()
 
 def simulator_test():
@@ -184,8 +186,4 @@ def get_polar_matrices(np_origin):
 # Main
 ######
 if __name__ == '__main__':
-    r, theta = get_polar_matrices(5)
-    print('\n')
-    print(r)
-    print('\n')
-    print(theta)
+    simulate_map_test()

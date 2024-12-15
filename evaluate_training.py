@@ -216,6 +216,7 @@ def test_model_dqn_limited(path):
         total_reward = 0
         no_collision = True
         prev_act_selection = None
+        positive_action = True
         while no_collision:
             curr_state = sim.car.lidar_reading
             state = np_to_tensor(curr_state).unsqueeze(0).to(device)
@@ -238,6 +239,28 @@ def test_model_dqn_limited(path):
             print("Action: ", action)
 
             # Execute! Get reward and done bool
+            collision = sim.check_collision_future(action)
+            while collision:
+                print("Collision detected, choosing another action")
+                print(action_probs)
+                action_probs[0, action_selection] = 0
+                action_selection = torch.argmax(action_probs).item()
+                if action_probs[0, action_selection] == 0:
+                    print("Negative actions activated")
+                    positive_action = not positive_action
+                    break
+                else:
+                    action = actions[action_selection]
+                collision = sim.check_collision_future(action)
+
+            if positive_action:
+                pass
+            else:
+                neg_act = action_selection + 2 if action_selection < 6 else action_selection - 6
+                action = actions[neg_act]
+
+            print(action_probs)
+
             no_collision, next_state = sim.step(action, False, plot=True)
             total_reward += rewarder.collect_reward(not no_collision, sim)
 

@@ -549,6 +549,23 @@ class Simulator:
             flag = True        
 
         return flag
+    
+    def check_collision_future(self, action):
+        """
+        Checks if an action will make the car collide with an obstacle or wall
+        
+        Returns:
+            flag (bool): True if car will be in a forbidden area, False otherwise
+        """
+        flag = False
+        try:
+            map_val = self.simulated_map.map[self.ground_truth_location[0] + int(action[0]), self.ground_truth_location[1] + int(action[1])]
+            if map_val != 0:
+                flag = True
+        except:
+            flag = True        
+
+        return flag
 
     def plot_car(self):
         """
